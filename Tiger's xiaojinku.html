@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>基金净值估算</title>
+  <style>
+    :root {
+      --red-dark:  #7B1C1C;
+      --red-main:  #A52020;
+      --red-mid:   #C0392B;
+      --red-light: #F5E6E6;
+      --up:        #1565C0;
+      --up-light:  #E3F0FF;
+      --down:      #E07B00;
+      --down-light:#FFF3E0;
+      --flat:      #888;
+      --bg:        #F4EDED;
+      --card:      #FFF;
+      --text:      #1A1A1A;
+      --text-sub:  #666;
+      --text-light:#AAA;
+      --border:    #EDE0E0;
+      --shadow:    rgba(122,28,28,0.10);
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html,body{height:100%;}
+    body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Helvetica Neue',sans-serif;color:var(--text);font-size:16px;padding-bottom:48px;}
+
+    /* ══ 顶部导航 ══ */
+    .header{background:linear-gradient(160deg,var(--red-dark) 0%,var(--red-main) 55%,var(--red-mid) 100%);color:#fff;padding:16px 16px 14px;position:sticky;top:0;z-index:100;box-shadow:0 3px 18px var(--shadow);}
+    .header-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+    .header-title{font-size:20px;font-weight:700;letter-spacing:2px;}
+    .header-sub{font-size:12px;opacity:.65;margin-top:2px;}
+    .hdr-btns{display:flex;gap:8px;}
+    .hdr-btn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:20px;padding:7px 14px;font-size:13px;cursor:pointer;font-weight:500;white-space:nowrap;}
+    .hdr-btn:hover{background:rgba(255,255,255,.28);}
+    .index-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+    .index-item{background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;}
+    .index-name{font-size:13px;opacity:.80;}
+    .index-right{text-align:right;}
+    .index-val{font-size:15px;font-weight:700;}
+    .index-chg{font-size:12px;margin-top:1px;}
+
+    /* ══ 汇总卡 ══ */
+    .summary-wrap{padding:16px 16px 0;}
+    .summary-card{background:linear-gradient(135deg,var(--red-dark) 0%,var(--red-mid) 100%);border-radius:20px;padding:22px 20px 18px;color:#fff;box-shadow:0 6px 28px var(--shadow);position:relative;overflow:hidden;}
+    .summary-card::before{content:'';position:absolute;right:-30px;top:-30px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.06);}
+    .summary-label{font-size:14px;opacity:.75;margin-bottom:5px;}
+    .summary-total{font-size:34px;font-weight:800;letter-spacing:1px;margin-bottom:16px;position:relative;z-index:1;}
+    .summary-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;position:relative;z-index:1;}
+    .summary-item{text-align:center;}
+    .s-val{font-size:17px;font-weight:700;}
+    .s-lbl{font-size:12px;opacity:.70;margin-top:3px;}
+    .s-up{color:#90CAF9;} .s-down{color:#FFCC80;} .s-flat{color:rgba(255,255,255,.75);}
+
+    /* ══ 区域标题 ══ */
+    .section{padding:18px 16px 4px;}
+    .section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+    .section-title{font-size:18px;font-weight:700;color:var(--red-dark);display:flex;align-items:center;gap:8px;}
+    .section-title::before{content:'';display:inline-block;width:4px;height:20px;background:var(--red-mid);border-radius:2px;}
+    .top-btns{display:flex;gap:8px;}
+    .add-btn{background:linear-gradient(135deg,var(--red-main),var(--red-mid));color:#fff;border:none;border-radius:22px;padding:8px 18px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 3px 10px var(--shadow);}
+    .grp-btn{background:#fff;color:var(--red-main);border:1.5px solid var(--red-light);border-radius:22px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;}
+
+    /* ══ 分组 ══ */
+    .group-block{margin-bottom:18px;}
+    .group-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 4px;}
+    .group-name-wrap{display:flex;align-items:center;gap:8px;}
+    .group-dot{width:10px;height:10px;border-radius:50%;background:var(--red-mid);}
+    .group-label{font-size:16px;font-weight:700;color:var(--red-dark);}
+    .group-count{font-size:13px;color:var(--text-light);background:var(--red-light);padding:2px 9px;border-radius:10px;}
+    .group-empty{text-align:center;padding:18px;color:var(--text-light);font-size:14px;border:2px dashed var(--border);border-radius:12px;}
+
+    /* ══ 基金卡片 ══ */
+    .fund-card{background:var(--card);border-radius:16px;padding:16px 16px 12px;margin-bottom:10px;box-shadow:0 2px 10px var(--shadow);border:1px solid var(--border);position:relative;transition:box-shadow .2s,transform .15s;}
+    .fund-card.dragging{opacity:.5;transform:scale(1.02);box-shadow:0 10px 32px var(--shadow);}
+    .fund-card.drag-over{border:2px dashed var(--red-mid);background:#FFF8F8;}
+    .drag-handle{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#CCC;font-size:18px;cursor:grab;user-select:none;padding:4px;}
+    .card-btns{position:absolute;top:10px;right:10px;display:flex;gap:4px;}
+    .card-btn{background:none;border:none;font-size:14px;color:#CCC;cursor:pointer;padding:3px 6px;border-radius:6px;transition:all .15s;}
+    .card-btn:hover{background:var(--red-light);color:var(--red-main);}
+    .card-btn.del:hover{background:#FEE;color:var(--red-mid);}
+
+    .fund-row1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-left:22px;}
+    .fund-name{font-size:16px;font-weight:700;line-height:1.3;max-width:200px;}
+    .fund-code-line{font-size:13px;color:var(--text-sub);margin-top:4px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+    .fund-badge{background:var(--red-light);color:var(--red-main);font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;}
+    .fund-change-big{font-size:26px;font-weight:800;text-align:right;line-height:1.2;}
+    .fund-change-sub{font-size:13px;text-align:right;margin-top:3px;color:var(--text-sub);}
+
+    .fund-divider{height:1px;background:var(--border);margin:8px 0;}
+    .fund-row2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
+    .fund-stat{text-align:center;}
+    .fs-val{font-size:15px;font-weight:700;}
+    .fs-lbl{font-size:12px;color:var(--text-light);margin-top:3px;}
+    .fund-update{font-size:12px;color:var(--text-light);margin-top:8px;text-align:right;}
+
+    /* ══ 走势图区域 ══ */
+    .chart-toggle{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);}
+    .chart-toggle-btn{background:var(--red-light);color:var(--red-main);border:none;border-radius:16px;padding:5px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+    .chart-toggle-btn:hover{background:var(--red-mid);color:#fff;}
+    .chart-toggle-btn.active{background:var(--red-mid);color:#fff;}
+    .chart-period-btns{display:flex;gap:5px;}
+    .period-btn{background:none;border:1px solid var(--border);border-radius:12px;padding:4px 10px;font-size:12px;color:var(--text-sub);cursor:pointer;transition:all .15s;}
+    .period-btn.active{background:var(--red-main);color:#fff;border-color:var(--red-main);}
+
+    .chart-area{margin-top:10px;display:none;}
+    .chart-area.show{display:block;}
+    .chart-canvas-wrap{position:relative;width:100%;background:#FAFAFA;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+    canvas.fund-chart{display:block;width:100%;height:180px;}
+
+    .chart-tooltip{position:absolute;background:rgba(30,30,30,.88);color:#fff;border-radius:8px;padding:7px 11px;font-size:12px;pointer-events:none;display:none;white-space:nowrap;z-index:10;}
+    .chart-loading{text-align:center;padding:40px 0;color:var(--text-light);font-size:14px;}
+    .chart-error{text-align:center;padding:30px 0;color:var(--down);font-size:13px;}
+
+    /* ══ 颜色 ══ */
+    .up{color:var(--up);} .down{color:var(--down);} .flat{color:var(--flat);}
+
+    /* ══ 空状态 ══ */
+    .empty-state{text-align:center;padding:44px 20px;color:var(--text-light);}
+    .empty-icon{font-size:52px;margin-bottom:12px;}
+    .empty-text{font-size:15px;line-height:1.8;}
+
+    /* ══ 底部 ══ */
+    .footer-time{text-align:center;font-size:13px;color:var(--text-light);padding:6px 16px 24px;}
+    .loading-bar{text-align:center;padding:12px;font-size:14px;color:var(--text-sub);}
+
+    /* ══ 弹窗 ══ */
+    .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;align-items:flex-end;justify-content:center;}
+    .overlay.show{display:flex;}
+    .modal{background:#fff;border-radius:24px 24px 0 0;padding:26px 20px 36px;width:100%;max-width:540px;animation:slideUp .25s ease;max-height:90vh;overflow-y:auto;}
+    @keyframes slideUp{from{transform:translateY(60px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+    .modal-title{font-size:19px;font-weight:700;color:var(--red-dark);margin-bottom:20px;}
+    .form-group{margin-bottom:16px;}
+    .form-label{font-size:15px;font-weight:600;color:var(--text);margin-bottom:7px;display:block;}
+    .form-input,.form-select{width:100%;border:2px solid var(--border);border-radius:12px;padding:12px 14px;font-size:16px;outline:none;color:var(--text);background:#fff;transition:border-color .2s;appearance:none;}
+    .form-input:focus,.form-select:focus{border-color:var(--red-mid);}
+    .form-hint{font-size:12px;color:var(--text-light);margin-top:4px;}
+    .modal-btns{display:flex;gap:10px;margin-top:22px;}
+    .modal-btns button{flex:1;padding:13px;border-radius:14px;border:none;font-size:16px;font-weight:600;cursor:pointer;}
+    .btn-cancel{background:#F0F0F0;color:#666;}
+    .btn-confirm{background:linear-gradient(135deg,var(--red-main),var(--red-mid));color:#fff;box-shadow:0 4px 14px var(--shadow);}
+    .grp-list-item{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--red-light);border-radius:12px;margin-bottom:8px;}
+    .grp-list-name{font-size:15px;font-weight:600;color:var(--red-dark);}
+    .grp-del-btn{background:none;border:none;font-size:18px;color:#CCC;cursor:pointer;}
+    .grp-del-btn:hover{color:var(--red-mid);}
+    .grp-add-row{display:flex;gap:8px;margin-top:12px;}
+    .grp-add-input{flex:1;border:2px solid var(--border);border-radius:12px;padding:11px 14px;font-size:15px;outline:none;}
+    .grp-add-input:focus{border-color:var(--red-mid);}
+    .grp-add-btn{background:linear-gradient(135deg,var(--red-main),var(--red-mid));color:#fff;border:none;border-radius:12px;padding:11px 18px;font-size:15px;font-weight:600;cursor:pointer;}
+
+    /* ══ 响应式 ══ */
+    @media(min-width:640px){
+      .index-grid{grid-template-columns:repeat(4,1fr);}
+      canvas.fund-chart{height:200px;}
+    }
+    @media(min-width:900px){
+      body{max-width:900px;margin:0 auto;}
+      .header{border-radius:0 0 20px 20px;}
+      .fund-row1{padding-left:26px;}
+      canvas.fund-chart{height:220px;}
+      .summary-total{font-size:40px;}
+      .s-val{font-size:20px;}
+    }
+    @media(min-width:1200px){
+      body{max-width:1100px;}
+      .fund-list-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;}
+    }
+  </style>
+</head>
+<body>
+
+<!-- 顶部 -->
+<div class="header">
+  <div class="header-top">
+    <div>
+      <div class="header-title">📈 基金净值估算</div>
+      <div class="header-sub">实时估值 · 走势一目了然</div>
+    </div>
+    <div class="hdr-btns">
+      <button class="hdr-btn" onclick="refreshAll()">🔄 刷新</button>
+    </div>
+  </div>
+  <div class="index-grid" id="indexBar">
+    <div class="index-item"><span class="index-name">上证指数</span><span class="index-right"><div class="index-val flat">--</div><div class="index-chg flat">--%</div></span></div>
+    <div class="index-item"><span class="index-name">沪深300</span><span class="index-right"><div class="index-val flat">--</div><div class="index-chg flat">--%</div></span></div>
+    <div class="index-item"><span class="index-name">深证成指</span><span class="index-right"><div class="index-val flat">--</div><div class="index-chg flat">--%</div></span></div>
+    <div class="index-item"><span class="index-name">创业板指</span><span class="index-right"><div class="index-val flat">--</div><div class="index-chg flat">--%</div></span></div>
+  </div>
+</div>
+
+<!-- 汇总 -->
+<div class="summary-wrap">
+  <div class="summary-card">
+    <div class="summary-label">账户总资产（元）</div>
+    <div class="summary-total" id="totalAsset">¥ --</div>
+    <div class="summary-row">
+      <div class="summary-item"><div class="s-val s-flat" id="todayProfit">--</div><div class="s-lbl">今日估算收益</div></div>
+      <div class="summary-item"><div class="s-val s-flat" id="totalProfit">--</div><div class="s-lbl">累计持有收益</div></div>
+      <div class="summary-item"><div class="s-val s-flat" id="totalReturn">--</div><div class="s-lbl">累计收益率</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 持仓 -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">我的持仓</div>
+    <div class="top-btns">
+      <button class="grp-btn" onclick="showGrpModal()">🗂 分组</button>
+      <button class="add-btn" onclick="showAddModal()">＋ 添加</button>
+    </div>
+  </div>
+  <div id="fundList"></div>
+  <div id="loadingBar"></div>
+</div>
+<div class="footer-time" id="footerTime"></div>
+
+<!-- 添加/编辑弹窗 -->
+<div class="overlay" id="addOverlay" onclick="overlayClick(event,'addOverlay')">
+  <div class="modal">
+    <div class="modal-title" id="addModalTitle">➕ 添加基金持仓</div>
+    <div class="form-group">
+      <label class="form-label">基金代码（6位数字）</label>
+      <input class="form-input" id="inputCode" type="text" placeholder="例如：000001" maxlength="6">
+    </div>
+    <div class="form-group">
+      <label class="form-label">当前持仓市值（元）</label>
+      <input class="form-input" id="inputAmount" type="number" placeholder="例如：50000">
+      <div class="form-hint">填写当前持有的市值，用于计算今日估算收益</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">买入总成本（元，可选）</label>
+      <input class="form-input" id="inputCost" type="number" placeholder="例如：55000">
+      <div class="form-hint">填写后可显示持有总收益和收益率</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">所属分组</label>
+      <select class="form-select" id="inputGroup"></select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="hideModal('addOverlay')">取消</button>
+      <button class="btn-confirm" id="addConfirmBtn" onclick="confirmAdd()">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 分组管理弹窗 -->
+<div class="overlay" id="grpOverlay" onclick="overlayClick(event,'grpOverlay')">
+  <div class="modal">
+    <div class="modal-title">🗂 分组管理</div>
+    <div id="grpList"></div>
+    <div class="grp-add-row">
+      <input class="grp-add-input" id="newGrpInput" placeholder="输入新分组名称" maxlength="12">
+      <button class="grp-add-btn" onclick="addGroup()">添加</button>
+    </div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="btn-confirm" onclick="hideModal('grpOverlay')">完成</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ 数据 ══
+let holdings = JSON.parse(localStorage.getItem('fnd_h3')||'[]');
+let groups   = JSON.parse(localStorage.getItem('fnd_g3')||'["默认分组","美基","债券"]');
+let cache    = {};       // 实时估值缓存
+let histCache= {};       // 历史净值缓存
+let editIdx  = -1;
+let chartOpen= {};       // 哪些卡片展开了图表
+let chartPeriod={};      // 每只基金当前选的周期
+
+function save(){
+  localStorage.setItem('fnd_h3',JSON.stringify(holdings));
+  localStorage.setItem('fnd_g3',JSON.stringify(groups));
+}
+
+// ══ 工具 ══
+function cc(v){const n=parseFloat(v);return n>0?'up':n<0?'down':'flat';}
+function fmt(n,pre=''){
+  if(n===null||isNaN(n))return '--';
+  const a=Math.abs(n).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  return n>0?`+${pre}${a}`:n<0?`-${pre}${a}`:`${pre}0.00`;
+}
+function fmtPct(n){
+  if(n===null||isNaN(n))return '--';
+  const s=Math.abs(n).toFixed(2)+'%';
+  return n>0?'+'+s:n<0?'-'+s:'0.00%';
+}
+function today(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function daysAgo(n){
+  const d=new Date(Date.now()-n*86400000);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ══ 数据获取 ══
+async function fetchIndex(){
+  try{
+    const codes='s_sh000001,s_sh000300,s_sz399001,s_sz399006';
+    const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://hq.sinajs.cn/list='+codes)}`);
+    const d=await r.json();
+    const lines=d.contents.split('\n').filter(l=>l.includes('"'));
+    const names=['上证指数','沪深300','深证成指','创业板指'];
+    const bar=document.getElementById('indexBar');
+    bar.innerHTML='';
+    lines.forEach((line,i)=>{
+      const m=line.match(/"(.+?)"/);if(!m)return;
+      const p=m[1].split(',');if(p.length<4)return;
+      const val=parseFloat(p[1]).toFixed(2);
+      const chg=parseFloat(p[3]).toFixed(2);
+      const c=cc(chg);
+      bar.innerHTML+=`<div class="index-item"><span class="index-name">${names[i]||''}</span><span class="index-right"><div class="index-val ${c}">${val}</div><div class="index-chg ${c}">${chg>0?'+':''}${chg}%</div></span></div>`;
+    });
+  }catch(e){console.log('指数失败',e);}
+}
+
+async function fetchFund(code){
+  try{
+    const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(`https://fundgz.1234567.com.cn/js/${code}.js?rt=${Date.now()}`)}`);
+    const d=await r.json();
+    const m=d.contents.match(/jsonpgz\((\{.*?\})\)/);
+    if(m)return JSON.parse(m[1]);
+  }catch(e){console.log('基金'+code+'失败',e);}
+  return null;
+}
+
+// 历史净值 — 东方财富 F10DataApi
+async function fetchHistory(code, days=90){
+  const key=`${code}_${days}`;
+  if(histCache[key])return histCache[key];
+  try{
+    const sdate=daysAgo(days), edate=today();
+    const url=`https://api.fund.eastmoney.com/f10/lsjz?callback=cb&fundCode=${code}&pageIndex=1&pageSize=${days}&startDate=${sdate}&endDate=${edate}`;
+    const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+    const d=await r.json();
+    const m=d.contents.match(/cb\((.*)\)/s);
+    if(!m)throw new Error('no match');
+    const json=JSON.parse(m[1]);
+    const rows=(json.Data&&json.Data.LSJZList)||[];
+    const result=rows.reverse().map(row=>({date:row.FSRQ,nav:parseFloat(row.DWJZ),rate:parseFloat(row.JZZZL||0)}));
+    histCache[key]=result;
+    return result;
+  }catch(e){
+    console.log('历史净值失败',e);
+    return null;
+  }
+}
+
+// ══ 渲染主列表 ══
+function renderFunds(){
+  const el=document.getElementById('fundList');
+  if(!holdings.length){
+    el.innerHTML=`<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">还没有持仓<br>点击右上角 ＋添加 开始使用</div></div>`;
+    updateSummary();return;
+  }
+  const grouped={};
+  groups.forEach(g=>grouped[g]=[]);
+  grouped['未分组']=[];
+  holdings.forEach((h,i)=>{
+    const g=h.group&&groups.includes(h.group)?h.group:'未分组';
+    grouped[g].push({h,i});
+  });
+
+  let html='';
+  [...groups,'未分组'].forEach(gname=>{
+    const items=grouped[gname];
+    if(!items)return;
+    if(gname==='未分组'&&items.length===0)return;
+    let gTotal=0,gToday=0,hasToday=false;
+    items.forEach(({h})=>{
+      gTotal+=h.amount;
+      const fd=cache[h.code];
+      if(fd){gToday+=h.amount*parseFloat(fd.gszzl)/100;hasToday=true;}
+    });
+    html+=`<div class="group-block" id="grp-${gname}" data-group="${gname}">`;
+    html+=`<div class="group-header">
+      <div class="group-name-wrap">
+        <div class="group-dot"></div>
+        <div class="group-label">${gname}</div>
+        <div class="group-count">${items.length}只</div>
+      </div>
+      <div style="font-size:13px;color:var(--text-sub);">
+        ${hasToday?`<span class="${cc(gToday)}">${fmt(gToday,'¥')}</span> `:''}
+        <span style="color:var(--text-light);">¥${gTotal.toLocaleString('zh-CN',{maximumFractionDigits:0})}</span>
+      </div>
+    </div>`;
+    if(items.length===0){
+      html+=`<div class="group-empty">暂无基金，拖拽其他分组的基金到这里</div>`;
+    } else {
+      html+=`<div class="fund-list-grid">`;
+      items.forEach(({h,i})=>{
+        const fd=cache[h.code];
+        const name=fd?fd.name:(h.name||h.code);
+        const gszzl=fd?parseFloat(fd.gszzl):null;
+        const gsz=fd?parseFloat(fd.gsz):null;
+        const dwjz=fd?parseFloat(fd.dwjz):null;
+        const todayEst=gszzl!==null?h.amount*gszzl/100:null;
+        const totalP=h.cost?h.amount-h.cost:null;
+        const totalR=h.cost?(h.amount-h.cost)/h.cost*100:null;
+        const c=gszzl!==null?cc(gszzl):'flat';
+        const isOpen=chartOpen[h.code]||false;
+        const period=chartPeriod[h.code]||'3m';
+        html+=`
+        <div class="fund-card" draggable="true" data-idx="${i}"
+          ondragstart="dragStart(event,${i})"
+          ondragover="dragOver(event)"
+          ondrop="dragDrop(event,${i})"
+          ondragend="dragEnd(event)"
+          ondragleave="dragLeave(event)">
+          <span class="drag-handle" title="拖拽排序">⠿</span>
+          <div class="card-btns">
+            <button class="card-btn" onclick="showEditModal(${i})" title="编辑">✏️</button>
+            <button class="card-btn del" onclick="delFund(${i})" title="删除">✕</button>
+          </div>
+          <div class="fund-row1">
+            <div>
+              <div class="fund-name">${name}</div>
+              <div class="fund-code-line">
+                <span>${h.code}</span>
+                <span class="fund-badge">估值 ${gsz!==null?gsz.toFixed(4):'--'}</span>
+              </div>
+            </div>
+            <div>
+              <div class="fund-change-big ${c}">${gszzl!==null?(gszzl>0?'+':'')+gszzl.toFixed(2)+'%':'--'}</div>
+              <div class="fund-change-sub">昨净值 ${dwjz!==null?dwjz.toFixed(4):'--'}</div>
+            </div>
+          </div>
+          <div class="fund-divider"></div>
+          <div class="fund-row2">
+            <div class="fund-stat"><div class="fs-val">${h.amount.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="fs-lbl">持仓市值(元)</div></div>
+            <div class="fund-stat"><div class="fs-val ${c}">${todayEst!==null?fmt(todayEst,'¥'):'--'}</div><div class="fs-lbl">今日估算收益</div></div>
+            <div class="fund-stat"><div class="fs-val ${totalP!==null?cc(totalP):'flat'}">${totalP!==null?fmt(totalP,'¥'):'--'}</div><div class="fs-lbl">${totalR!==null?fmtPct(totalR):'未填成本'}</div></div>
+          </div>
+          <div class="fund-update">${fd?'更新于 '+fd.gztime:'数据加载中...'}</div>
+
+          <!-- 走势图 -->
+          <div class="chart-toggle">
+            <button class="chart-toggle-btn ${isOpen?'active':''}" onclick="toggleChart('${h.code}',${i})">
+              ${isOpen?'▲ 收起走势':'📊 查看走势'}
+            </button>
+            <div class="chart-period-btns" style="display:${isOpen?'flex':'none'}">
+              <button class="period-btn ${period==='1m'?'active':''}" onclick="switchPeriod('${h.code}',${i},'1m')">1月</button>
+              <button class="period-btn ${period==='3m'?'active':''}" onclick="switchPeriod('${h.code}',${i},'3m')">3月</button>
+              <button class="period-btn ${period==='6m'?'active':''}" onclick="switchPeriod('${h.code}',${i},'6m')">6月</button>
+              <button class="period-btn ${period==='1y'?'active':''}" onclick="switchPeriod('${h.code}',${i},'1y')">1年</button>
+            </div>
+          </div>
+          <div class="chart-area ${isOpen?'show':''}" id="chart-area-${h.code}">
+            <div class="chart-canvas-wrap" id="chart-wrap-${h.code}">
+              <div class="chart-loading" id="chart-loading-${h.code}">⏳ 加载中...</div>
+              <canvas class="fund-chart" id="chart-${h.code}" style="display:none;"></canvas>
+              <div class="chart-tooltip" id="chart-tip-${h.code}"></div>
+            </div>
+          </div>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html;
+  updateSummary();
+  // 恢复已展开的图表
+  Object.keys(chartOpen).forEach(code=>{
+    if(chartOpen[code]) loadAndDrawChart(code);
+  });
+}
+
+function updateSummary(){
+  let total=0,today=0,cost=0,hasToday=false,hasCost=false;
+  holdings.forEach(h=>{
+    total+=h.amount;
+    const fd=cache[h.code];
+    if(fd){today+=h.amount*parseFloat(fd.gszzl)/100;hasToday=true;}
+    if(h.cost){cost+=h.cost;hasCost=true;}
+  });
+  document.getElementById('totalAsset').textContent=holdings.length?'¥ '+total.toLocaleString('zh-CN',{minimumFractionDigits:2}):'¥ --';
+  const tp=document.getElementById('todayProfit');
+  tp.textContent=hasToday?fmt(today,'¥'):'--';
+  tp.className='s-val '+(hasToday?(today>0?'s-up':today<0?'s-down':'s-flat'):'s-flat');
+  if(hasCost){
+    const p=total-cost,r=p/cost*100;
+    const ep=document.getElementById('totalProfit');
+    ep.textContent=fmt(p,'¥');ep.className='s-val '+(p>0?'s-up':p<0?'s-down':'s-flat');
+    const er=document.getElementById('totalReturn');
+    er.textContent=fmtPct(r);er.className='s-val '+(r>0?'s-up':r<0?'s-down':'s-flat');
+  } else {
+    document.getElementById('totalProfit').textContent='--';
+    document.getElementById('totalReturn').textContent='--';
+  }
+}
+
+// ══ 走势图 ══
+const periodDays={'1m':30,'3m':90,'6m':180,'1y':365};
+
+async function toggleChart(code, idx){
+  chartOpen[code]=!chartOpen[code];
+  if(!chartPeriod[code])chartPeriod[code]='3m';
+  renderFunds();
+  if(chartOpen[code]) await loadAndDrawChart(code);
+}
+
+async function switchPeriod(code, idx, period){
+  chartPeriod[code]=period;
+  // 清缓存强制重新拉
+  delete histCache[`${code}_${periodDays[period]}`];
+  renderFunds();
+  await loadAndDrawChart(code);
+}
+
+async function loadAndDrawChart(code){
+  const period=chartPeriod[code]||'3m';
+  const days=periodDays[period];
+  const loadEl=document.getElementById(`chart-loading-${code}`);
+  const canvasEl=document.getElementById(`chart-${code}`);
+  if(!loadEl||!canvasEl)return;
+  loadEl.style.display='block';
+  canvasEl.style.display='none';
+  const data=await fetchHistory(code,days);
+  if(!data||data.length<2){
+    loadEl.innerHTML='<div class="chart-error">暂无历史净值数据</div>';
+    return;
+  }
+  loadEl.style.display='none';
+  canvasEl.style.display='block';
+  drawChart(code, data);
+}
+
+function drawChart(code, data){
+  const canvas=document.getElementById(`chart-${code}`);
+  if(!canvas)return;
+  const wrap=document.getElementById(`chart-wrap-${code}`);
+  const dpr=window.devicePixelRatio||1;
+  const W=wrap.clientWidth||320;
+  const H=canvas.offsetHeight||180;
+  canvas.width=W*dpr;
+  canvas.height=H*dpr;
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+
+  const pad={top:20,right:14,bottom:36,left:52};
+  const cw=W-pad.left-pad.right;
+  const ch=H-pad.top-pad.bottom;
+
+  const navs=data.map(d=>d.nav);
+  const minV=Math.min(...navs);
+  const maxV=Math.max(...navs);
+  const range=maxV-minV||0.001;
+  const isUp=navs[navs.length-1]>=navs[0];
+
+  // 主色
+  const lineColor=isUp?'#1565C0':'#E07B00';
+  const fillColor=isUp?'rgba(21,101,192,0.10)':'rgba(224,123,0,0.10)';
+
+  // 背景
+  ctx.fillStyle='#FAFAFA';
+  ctx.fillRect(0,0,W,H);
+
+  // 网格
+  ctx.strokeStyle='#EEE';
+  ctx.lineWidth=1;
+  const gridLines=4;
+  for(let i=0;i<=gridLines;i++){
+    const y=pad.top+ch*(i/gridLines);
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+cw,y);ctx.stroke();
+    // Y轴标签
+    const val=(maxV-range*(i/gridLines)).toFixed(4);
+    ctx.fillStyle='#AAA';
+    ctx.font=`${11*dpr/dpr}px -apple-system,sans-serif`;
+    ctx.textAlign='right';
+    ctx.fillText(val,pad.left-4,y+4);
+  }
+
+  // X轴日期标签（均匀取5个）
+  ctx.fillStyle='#AAA';
+  ctx.textAlign='center';
+  ctx.font='11px -apple-system,sans-serif';
+  const xTicks=5;
+  for(let i=0;i<xTicks;i++){
+    const di=Math.round(i*(data.length-1)/(xTicks-1));
+    const x=pad.left+cw*(di/(data.length-1));
+    const label=data[di].date.slice(5); // MM-DD
+    ctx.fillText(label,x,H-8);
+  }
+
+  // 折线路径
+  const pts=data.map((d,i)=>({
+    x:pad.left+cw*(i/(data.length-1)),
+    y:pad.top+ch*(1-(d.nav-minV)/range)
+  }));
+
+  // 填充区域
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x,pad.top+ch);
+  pts.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.lineTo(pts[pts.length-1].x,pad.top+ch);
+  ctx.closePath();
+  ctx.fillStyle=fillColor;
+  ctx.fill();
+
+  // 折线
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle=lineColor;
+  ctx.lineWidth=2;
+  ctx.lineJoin='round';
+  ctx.stroke();
+
+  // 最后一个点高亮
+  const last=pts[pts.length-1];
+  ctx.beginPath();
+  ctx.arc(last.x,last.y,4,0,Math.PI*2);
+  ctx.fillStyle=lineColor;
+  ctx.fill();
+  ctx.strokeStyle='#fff';
+  ctx.lineWidth=2;
+  ctx.stroke();
+
+  // ── 交互：hover tooltip ──
+  const tip=document.getElementById(`chart-tip-${code}`);
+  canvas.onmousemove=canvas.ontouchmove=function(e){
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect();
+    const clientX=e.touches?e.touches[0].clientX:e.clientX;
+    const mx=clientX-rect.left;
+    const idx=Math.round((mx-pad.left)/cw*(data.length-1));
+    if(idx<0||idx>=data.length){tip.style.display='none';return;}
+    const d=data[idx];
+    const p=pts[idx];
+    // 十字线
+    ctx.clearRect(0,0,W,H);
+    // 重绘背景和图
+    drawChartStatic(ctx,W,H,pad,cw,ch,data,pts,navs,minV,maxV,range,lineColor,fillColor,dpr);
+    ctx.save();
+    ctx.strokeStyle='rgba(0,0,0,.2)';
+    ctx.lineWidth=1;
+    ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(p.x,pad.top);ctx.lineTo(p.x,pad.top+ch);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(pad.left,p.y);ctx.lineTo(pad.left+cw,p.y);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // 高亮点
+    ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);
+    ctx.fillStyle=lineColor;ctx.fill();
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+    // tooltip
+    const rateStr=d.rate>=0?`+${d.rate.toFixed(2)}%`:`${d.rate.toFixed(2)}%`;
+    tip.innerHTML=`${d.date}<br>净值 <b>${d.nav.toFixed(4)}</b>　日涨跌 <b>${rateStr}</b>`;
+    tip.style.display='block';
+    let tx=p.x+12, ty=p.y-40;
+    if(tx+130>W)tx=p.x-140;
+    if(ty<0)ty=p.y+10;
+    tip.style.left=tx+'px';
+    tip.style.top=ty+'px';
+  };
+  canvas.onmouseleave=canvas.ontouchend=function(){
+    tip.style.display='none';
+    ctx.clearRect(0,0,W,H);
+    drawChartStatic(ctx,W,H,pad,cw,ch,data,pts,navs,minV,maxV,range,lineColor,fillColor,dpr);
+  };
+}
+
+function drawChartStatic(ctx,W,H,pad,cw,ch,data,pts,navs,minV,maxV,range,lineColor,fillColor,dpr){
+  ctx.fillStyle='#FAFAFA';ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='#EEE';ctx.lineWidth=1;
+  const gridLines=4;
+  for(let i=0;i<=gridLines;i++){
+    const y=pad.top+ch*(i/gridLines);
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+cw,y);ctx.stroke();
+    const val=(maxV-range*(i/gridLines)).toFixed(4);
+    ctx.fillStyle='#AAA';ctx.font='11px -apple-system,sans-serif';ctx.textAlign='right';
+    ctx.fillText(val,pad.left-4,y+4);
+  }
+  ctx.fillStyle='#AAA';ctx.textAlign='center';ctx.font='11px -apple-system,sans-serif';
+  const xTicks=5;
+  for(let i=0;i<xTicks;i++){
+    const di=Math.round(i*(data.length-1)/(xTicks-1));
+    const x=pad.left+cw*(di/(data.length-1));
+    ctx.fillText(data[di].date.slice(5),x,H-8);
+  }
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x,pad.top+ch);
+  pts.forEach(p=>ctx.lineTo(p.x,p.y));
+  ctx.lineTo(pts[pts.length-1].x,pad.top+ch);
+  ctx.closePath();ctx.fillStyle=fillColor;ctx.fill();
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle=lineColor;ctx.lineWidth=2;ctx.lineJoin='round';ctx.stroke();
+  const last=pts[pts.length-1];
+  ctx.beginPath();ctx.arc(last.x,last.y,4,0,Math.PI*2);
+  ctx.fillStyle=lineColor;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+}
+
+// ══ 刷新 ══
+async function refreshAll(){
+  document.getElementById('loadingBar').innerHTML='<div class="loading-bar">⏳ 数据更新中，请稍候...</div>';
+  await fetchIndex();
+  for(const h of holdings){
+    const d=await fetchFund(h.code);
+    if(d){cache[h.code]=d;if(!h.name)h.name=d.name;}
+  }
+  save();renderFunds();
+  document.getElementById('loadingBar').innerHTML='';
+  document.getElementById('footerTime').textContent='最后更新：'+new Date().toLocaleString('zh-CN');
+}
+
+// ══ 弹窗 ══
+function overlayClick(e,id){if(e.target===document.getElementById(id))hideModal(id);}
+function hideModal(id){
+  document.getElementById(id).classList.remove('show');
+  if(id==='addOverlay'){['inputCode','inputAmount','inputCost'].forEach(x=>document.getElementById(x).value='');editIdx=-1;}
+}
+function fillGroupSelect(sel){
+  const el=document.getElementById('inputGroup');
+  el.innerHTML=groups.map(g=>`<option value="${g}" ${g===sel?'selected':''}>${g}</option>`).join('');
+}
+function showAddModal(){
+  editIdx=-1;
+  document.getElementById('addModalTitle').textContent='➕ 添加基金持仓';
+  document.getElementById('addConfirmBtn').textContent='确认添加';
+  document.getElementById('inputCode').disabled=false;
+  ['inputCode','inputAmount','inputCost'].forEach(x=>document.getElementById(x).value='');
+  fillGroupSelect(groups[0]);
+  document.getElementById('addOverlay').classList.add('show');
+  setTimeout(()=>document.getElementById('inputCode').focus(),300);
+}
+function showEditModal(idx){
+  editIdx=idx;const h=holdings[idx];
+  document.getElementById('addModalTitle').textContent='✏️ 编辑持仓信息';
+  document.getElementById('addConfirmBtn').textContent='保存修改';
+  document.getElementById('inputCode').value=h.code;
+  document.getElementById('inputCode').disabled=true;
+  document.getElementById('inputAmount').value=h.amount;
+  document.getElementById('inputCost').value=h.cost||'';
+  fillGroupSelect(h.group||groups[0]);
+  document.getElementById('addOverlay').classList.add('show');
+  setTimeout(()=>document.getElementById('inputAmount').focus(),300);
+}
+async function confirmAdd(){
+  const code=document.getElementById('inputCode').value.trim();
+  const amount=parseFloat(document.getElementById('inputAmount').value);
+  const cost=parseFloat(document.getElementById('inputCost').value)||null;
+  const group=document.getElementById('inputGroup').value;
+  if(editIdx>=0){
+    if(isNaN(amount)||amount<=0){alert('请输入正确的持仓市值');return;}
+    holdings[editIdx].amount=amount;holdings[editIdx].cost=cost;holdings[editIdx].group=group;
+    save();hideModal('addOverlay');renderFunds();return;
+  }
+  if(!code||code.length!==6||!/^\d{6}$/.test(code)){alert('请输入正确的6位数字基金代码');return;}
+  if(isNaN(amount)||amount<=0){alert('请输入正确的持仓市值');return;}
+  if(holdings.find(h=>h.code===code)){alert('该基金已添加过了');return;}
+  hideModal('addOverlay');
+  holdings.push({code,amount,cost,group,name:''});
+  save();renderFunds();
+  const d=await fetchFund(code);
+  if(d){cache[code]=d;holdings[holdings.length-1].name=d.name;save();}
+  renderFunds();
+}
+function delFund(i){
+  if(confirm('确认删除这只基金？')){holdings.splice(i,1);save();renderFunds();}
+}
+
+// ══ 分组 ══
+function showGrpModal(){renderGrpList();document.getElementById('grpOverlay').classList.add('show');}
+function renderGrpList(){
+  const el=document.getElementById('grpList');
+  if(!groups.length){el.innerHTML='<div style="color:var(--text-light);text-align:center;padding:16px;">还没有分组</div>';return;}
+  el.innerHTML=groups.map((g,i)=>`
+    <div class="grp-list-item">
+      <span class="grp-list-name">📁 ${g}</span>
+      <button class="grp-del-btn" onclick="delGroup(${i})">×</button>
+    </div>`).join('');
+}
+function addGroup(){
+  const v=document.getElementById('newGrpInput').value.trim();
+  if(!v){alert('请输入分组名称');return;}
+  if(groups.includes(v)){alert('分组名称已存在');return;}
+  groups.push(v);save();renderGrpList();document.getElementById('newGrpInput').value='';
+}
+function delGroup(i){
+  const gname=groups[i];
+  const count=holdings.filter(h=>h.group===gname).length;
+  if(count>0&&!confirm(`分组"${gname}"下有${count}只基金，删除后将移入未分组，确认？`))return;
+  holdings.forEach(h=>{if(h.group===gname)h.group='';});
+  groups.splice(i,1);save();renderGrpList();renderFunds();
+}
+
+// ══ 拖拽 ══
+let dragSrcIdx=null;
+function dragStart(e,idx){dragSrcIdx=idx;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function dragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over');}
+function dragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function dragEnd(e){e.currentTarget.classList.remove('dragging');}
+function dragDrop(e,targetIdx){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  if(dragSrcIdx===null||dragSrcIdx===targetIdx)return;
+  const moved=holdings.splice(dragSrcIdx,1)[0];
+  const ti=targetIdx>dragSrcIdx?targetIdx-1:targetIdx;
+  moved.group=holdings[ti]?.group||'';
+  holdings.splice(ti,0,moved);
+  dragSrcIdx=null;save();renderFunds();
+}
+
+// ══ 初始化 ══
+renderFunds();
+refreshAll();
+setInterval(refreshAll,5*60*1000);
+window.addEventListener('resize',()=>{
+  Object.keys(chartOpen).forEach(code=>{
+    if(chartOpen[code])loadAndDrawChart(code);
+  });
+});
+</script>
+</body>
+</html>
